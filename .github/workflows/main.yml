@@ -1,0 +1,45 @@
+on: [push, pull_request]
+
+jobs:
+  build-html:
+    runs-on: ubuntu-16.04
+    strategy:
+      matrix:
+        node-version: [8.x, 10.x, 12.x]
+    steps:
+      - uses: actions/checkout@v1
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: yarn install, check and build
+        run: |
+          cd html
+          yarn install
+          yarn run check
+          yarn run build
+  build-src:
+    runs-on: ubuntu-16.04
+    strategy:
+      matrix:
+        lws-version: [3.1.0, 2.4.2, 1.7.9]
+    steps:
+      - uses: actions/checkout@v1
+      - name: install apt packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install build-essential cmake libjson-c-dev libssl-dev
+      - name: compile libwebsockets-${{ matrix.node-version }} from source
+        env:
+          LWS_VERSION: ${{ matrix.lws-version }}
+        run: |
+          cd $(mktemp -d)
+          curl -sLo- https://github.com/warmcat/libwebsockets/archive/v${LWS_VERSION}.tar.gz | tar xz
+          cd libwebsockets-${LWS_VERSION}
+          cmake -DLWS_UNIX_SOCK=ON -DLWS_IPV6=ON -DLWS_WITHOUT_TESTAPPS=ON -DCMAKE_BUILD_TYPE=RELEASE .
+          make && sudo make install
+      - name: build ttyd
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=RELEASE ..
+          make && sudo make install
+          ttyd -v
